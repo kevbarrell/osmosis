@@ -1,19 +1,27 @@
 {
   "expo": {
     "name": "CalvinCrush",
-    "slug": "CalvinCrush",
+    "slug": "calvincrush",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "calvincrush",
+    "extra": {
+      "expoClientId": "474836227948-07hbt5tgr2i1t1h0ouel2hhe9hdm2h3o.apps.googleusercontent.com"
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to your camera.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +32,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser"
+    ]
   }
 }
