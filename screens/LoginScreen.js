@@ -2,35 +2,36 @@ import { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   Alert,
   Image,
   Pressable,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import * as Google from 'expo-auth-session/providers/google';
 import * as Facebook from 'expo-auth-session/providers/facebook';
 import * as WebBrowser from 'expo-web-browser';
-import Logo from '../assets/logo.svg';
+import Logo from '../assets/logo.svg'; // Adjust path if needed
 
-import FormInput from '../components/FormInput';
-import Button from '../components/Button';
+import styles from '../constants/styles';
+import colors from '../constants/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation, onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const baseUrl = 'http://192.168.0.18:5000';
 
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: '474836227948-07hbt5tgr2i1t1h0ouel2hhe9hdm2h3o.apps.googleusercontent.com',
+    clientId: '474836227948-07hbt5tgr2i1t1h0ouel2hhe9hdm2h3o.apps.googleusercontent.com'
   });
 
   const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: '1136709971817930',
+    clientId: '1136709971817930'
   });
 
   useEffect(() => {
@@ -75,12 +76,12 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleGoogleLogin = async (googleAccessToken) => {
+  const handleGoogleLogin = async (token) => {
     try {
       const res = await fetch(`${baseUrl}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: googleAccessToken }),
+        body: JSON.stringify({ token }),
       });
 
       const data = await res.json();
@@ -99,12 +100,12 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
     }
   };
 
-  const handleFacebookLogin = async (fbAccessToken) => {
+  const handleFacebookLogin = async (token) => {
     try {
       const res = await fetch(`${baseUrl}/api/auth/facebook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: fbAccessToken }),
+        body: JSON.stringify({ token }),
       });
 
       const data = await res.json();
@@ -124,32 +125,55 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Logo width={300} height={80} />
       </View>
 
-      <FormInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        type="text"
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Enter your email"
+          placeholderTextColor={colors.lightPink}
+          autoCapitalize="none"
+        />
+      </View>
 
-      <FormInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password"
-        type="password"
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Password</Text>
+        <View style={{ position: 'relative' }}>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            placeholderTextColor={colors.lightPink}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+          />
+          <Pressable
+            onPress={() => setShowPassword((prev) => !prev)}
+            style={{ position: 'absolute', right: 10, top: 15 }}
+          >
+            <Ionicons
+              name={showPassword ? 'eye' : 'eye-off'}
+              size={20}
+              color={colors.white}
+            />
+          </Pressable>
+        </View>
+      </View>
 
       <Pressable onPress={() => navigation.navigate('ForgotPassword')}>
         <Text style={styles.forgot}>Forgot password?</Text>
       </Pressable>
 
-      <Button title="Log In" onPress={handleLogin} />
+      <Pressable style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Log In</Text>
+      </Pressable>
 
       <View style={styles.divider} />
 
@@ -170,14 +194,14 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
       />
 
       <View style={{ alignItems: 'center', marginTop: 20 }}>
-        <Text style={styles.signupText}>
+        <Text style={styles.text}>
           Don’t have an account?{' '}
-          <Text style={styles.signupLink} onPress={() => navigation.navigate('Signup')}>
+          <Text style={styles.link} onPress={() => navigation.navigate('Signup')}>
             Sign Up
           </Text>
         </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -189,57 +213,3 @@ function SocialButton({ iconUri, label, onPress }) {
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    backgroundColor: '#440544',
-    padding: 20,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  forgot: {
-    color: '#E892E8',
-    fontWeight: 'bold',
-    textAlign: 'right',
-    marginBottom: 20,
-  },
-  divider: {
-    marginVertical: 30,
-    borderBottomColor: '#E892E8',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#eee',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  socialIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-    resizeMode: 'contain',
-  },
-  socialText: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
-  },
-  signupText: {
-    color: '#eee',
-  },
-  signupLink: {
-    color: '#E892E8',
-    fontWeight: 'bold',
-  },
-});

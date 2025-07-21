@@ -7,15 +7,17 @@ import {
   Image,
   Pressable,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import TopNavBar from '../components/TopNavBar';
 
 const PURPLE = '#6B21A8';
 const DARK_PURPLE = '#440544';
 const PINK = '#EC4899';
 
 export default function ProfileScreen({ navigation, route }) {
-  const { userId, baseUrl } = route.params;
+  const { userId, baseUrl, onLogout } = route.params;
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,61 +39,70 @@ export default function ProfileScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <TopNavBar onLogout={onLogout} navigation={navigation} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.center}>
-        <Text style={{ color: 'white' }}>Profile not found.</Text>
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <TopNavBar onLogout={onLogout} navigation={navigation} />
+        <View style={styles.center}>
+          <Text style={{ color: 'white' }}>Profile not found.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>Your Photos</Text>
-        <View style={styles.photoGrid}>
-          {profile.photos?.map((uri, index) => (
-            <View
-              key={index}
-              style={[
-                styles.photoBox,
-                index === 0 && { borderColor: PINK, borderWidth: 3 },
-              ]}
-            >
-              <Image source={{ uri }} style={styles.photo} />
-              <View style={styles.orderNumber}>
-                <Text style={{ color: 'white', fontSize: 12 }}>{index + 1}</Text>
+    <SafeAreaView style={styles.safe}>
+      <TopNavBar onLogout={onLogout} navigation={navigation} />
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>Your Photos</Text>
+          <View style={styles.photoGrid}>
+            {profile.photos?.map((uri, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.photoBox,
+                  index === 0 && { borderColor: PINK, borderWidth: 3 },
+                ]}
+              >
+                <Image source={{ uri }} style={styles.photo} />
+                <View style={styles.orderNumber}>
+                  <Text style={{ color: 'white', fontSize: 12 }}>{index + 1}</Text>
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
 
-        <Text style={styles.sectionTitle}>Profile Info</Text>
-        <Info label="Age" value={profile.age} />
-        <Info label="Gender" value={profile.gender} />
-        <Info label="Headline" value={profile.headline} />
-        <Info label="Location" value={profile.location} />
-        <Info label="Denomination" value={profile.denomination} />
-        <Info label="Marital Status" value={profile.maritalStatus} />
-        <Info label="Drinking" value={profile.drinking} />
-        <Info label="Smoking" value={profile.smoking} />
-        <Info label="Hobbies" value={profile.hobbies} />
-        <Info label="About Me" value={profile.aboutMe} />
-      </ScrollView>
+          <Text style={styles.sectionTitle}>Profile Info</Text>
+          <Info label="Age" value={profile.age} />
+          <Info label="Gender" value={profile.gender} />
+          <Info label="Headline" value={profile.headline} />
+          <Info label="Location" value={profile.location} />
+          <Info label="Denomination" value={profile.denomination} />
+          <Info label="Marital Status" value={profile.maritalStatus} />
+          <Info label="Drinking" value={profile.drinking} />
+          <Info label="Smoking" value={profile.smoking} />
+          <Info label="Hobbies" value={profile.hobbies} />
+          <Info label="About Me" value={profile.aboutMe} />
+        </ScrollView>
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => navigation.navigate('EditProfile')}
-      >
-        <Ionicons name="create" size={24} color="white" />
-      </Pressable>
-    </View>
+        <Pressable
+          style={styles.fab}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
+          <Ionicons name="create" size={24} color="white" />
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -106,9 +117,12 @@ function Info({ label, value }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: DARK_PURPLE,
+  },
+  container: {
+    flex: 1,
   },
   scrollContent: {
     padding: 16,
@@ -116,7 +130,6 @@ const styles = StyleSheet.create({
   },
   center: {
     flex: 1,
-    backgroundColor: DARK_PURPLE,
     justifyContent: 'center',
     alignItems: 'center',
   },

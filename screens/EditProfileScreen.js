@@ -1,48 +1,39 @@
-// EditProfileScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   Pressable,
-  StyleSheet,
   ScrollView,
   Image,
   Alert,
   Platform,
   KeyboardAvoidingView,
   SafeAreaView,
-  Dimensions
+  Dimensions,
+  FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import DraggableFlatList from 'react-native-draggable-flatlist';
-
-const DARK_PURPLE = '#440544';
-const PINK = '#E892E8';
-const PURPLE = '#A828AA';
-const GRAY = '#ccc';
+import styles from '../constants/styles';
+import colors from '../constants/colors';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SIDE_PADDING = 20;
 const NUM_COLUMNS = 3;
-const SPACING = 10;
-const ITEM_SIZE = (SCREEN_WIDTH - SIDE_PADDING * 2 - SPACING * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
 const ALL_HOBBIES = [
   'Hiking', 'Cooking', 'Dancing', 'Traveling', 'Movies',
   'Board Games', 'Gym', 'Reading', 'Sports', 'Coffee',
   'Dogs', 'Cats', 'Volunteering', 'Live Music', 'Picnics',
   'Mini Golf', 'Photography', 'Beach', 'Karaoke', 'Art',
-  'Biking', 'Yoga', 'Camping', 'Bowling'
+  'Biking', 'Yoga', 'Camping', 'Bowling',
 ];
 
-export default function EditProfileScreen({ navigation, route }) {
+export default function EditProfileScreen({ navigation, route, justSignedUp, setJustSignedUp }) {
   const { userId, baseUrl } = route.params;
 
   const [photos, setPhotos] = useState([]);
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
-  const [headline, setHeadline] = useState('');
   const [location, setLocation] = useState('');
   const [denomination, setDenomination] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
@@ -50,6 +41,31 @@ export default function EditProfileScreen({ navigation, route }) {
   const [smoking, setSmoking] = useState('');
   const [hobbies, setHobbies] = useState([]);
   const [aboutMe, setAboutMe] = useState('');
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/users/${userId}`);
+        const data = await res.json();
+        if (res.ok) {
+          setPhotos(data.photos?.map((uri, i) => ({ key: `photo-${i}`, uri })) || []);
+          setAge(data.age?.toString() || '');
+          setGender(data.gender || '');
+          setLocation(data.location || '');
+          setDenomination(data.denomination || '');
+          setMaritalStatus(data.maritalStatus || '');
+          setDrinking(data.drinking || '');
+          setSmoking(data.smoking || '');
+          setHobbies(data.hobbies || []);
+          setAboutMe(data.aboutMe || '');
+        }
+      } catch (err) {
+        console.error('Error loading profile:', err);
+      }
+    };
+
+    fetchUserData();
+  }, [userId]);
 
   const pickImage = async () => {
     if (photos.length >= 6) {
@@ -66,11 +82,7 @@ export default function EditProfileScreen({ navigation, route }) {
 
     if (!result.canceled) {
       const uri = result.assets[0].uri;
-
-      setPhotos((prev) => [
-        ...prev,
-        { key: Date.now().toString(), uri },
-      ]);
+      setPhotos((prev) => [...prev, { key: Date.now().toString(), uri }]);
     }
   };
 
@@ -79,22 +91,19 @@ export default function EditProfileScreen({ navigation, route }) {
     displayPhotos.push({ key: 'add', type: 'add' });
   }
 
-  const renderItem = ({ item, drag }) => {
+  const renderItem = ({ item }) => {
     if (item.type === 'add') {
       return (
         <Pressable onPress={pickImage} style={styles.photoBox}>
           <View style={styles.addButton}>
-            <Text style={styles.addText}>+ Add</Text>
+            <Text style={styles.addText}>+</Text>
           </View>
         </Pressable>
       );
     }
 
     return (
-      <Pressable
-        onLongPress={drag}
-        style={[styles.photoBox, { borderColor: PINK }]}
-      >
+      <View style={[styles.photoBox, { borderColor: colors.lightPink }]}>
         <Image source={{ uri: item.uri }} style={styles.photo} />
         <Pressable
           onPress={() => {
@@ -103,9 +112,9 @@ export default function EditProfileScreen({ navigation, route }) {
           }}
           style={styles.deleteX}
         >
-          <Text style={{ color: 'white', fontWeight: 'bold' }}>×</Text>
+          <Text style={styles.deleteXText}>×</Text>
         </Pressable>
-      </Pressable>
+      </View>
     );
   };
 
@@ -120,16 +129,15 @@ export default function EditProfileScreen({ navigation, route }) {
   };
 
   const handleSave = async () => {
-    if (!age || !gender || !headline || photos.length === 0) {
-      Alert.alert('Error', 'Please complete all required fields and upload at least one photo.');
+    if (!age || !gender || photos.length === 0) {
+      Alert.alert('Error', 'Please fill out your age, gender, and upload at least one photo.');
       return;
     }
 
     const profileData = {
       photos: photos.map((p) => p.uri),
       age,
-      gender,
-      headline,
+      gender: gender.toLowerCase(),
       location,
       denomination,
       maritalStatus,
@@ -148,317 +156,161 @@ export default function EditProfileScreen({ navigation, route }) {
 
       if (!res.ok) throw new Error('Failed to save profile');
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainApp', params: { userId } }],
-      });
+      if (justSignedUp) {
+        setJustSignedUp(false);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { userId } }],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { userId, screen: 'Profile' } }],
+        });
+      }
     } catch (err) {
       Alert.alert('Save Failed', 'Could not save your profile.');
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: DARK_PURPLE }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.purple }}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>Edit Profile</Text>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          <View style={[styles.container, { marginTop: 20 }]}>
+            <Text style={styles.title}>Edit Profile</Text>
 
-          <Text style={styles.sectionLabel}>Your Photos (Tap + to add, drag to reorder)</Text>
-          <DraggableFlatList
-            data={displayPhotos}
-            keyExtractor={(item) => item.key}
-            renderItem={renderItem}
-            onDragEnd={({ data }) =>
-              setPhotos(data.filter((item) => item.type !== 'add'))
-            }
-            numColumns={NUM_COLUMNS}
-            scrollEnabled={false}
-            contentContainerStyle={styles.photoGrid}
-          />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Photos (Up to 6)*</Text>
+              <FlatList
+                data={displayPhotos}
+                keyExtractor={(item) => item.key}
+                renderItem={renderItem}
+                numColumns={NUM_COLUMNS}
+                scrollEnabled={false}
+                contentContainerStyle={styles.photoGrid}
+              />
+            </View>
 
-          <Text style={styles.label}>Age*</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={age}
-            onChangeText={setAge}
-          />
+            {[
+              { label: 'Age*', value: age, set: setAge, keyboardType: 'numeric' },
+              {
+                label: 'Gender*',
+                options: ['Male', 'Female'],
+                value: gender,
+                set: (val) => setGender(val.toLowerCase()),
+              },
+              { label: 'Location (City, State)', value: location, set: setLocation },
+              {
+                label: 'Denomination',
+                options: ['Presbyterian', 'Baptist', 'Methodist', 'Other'],
+                value: denomination,
+                set: setDenomination,
+              },
+              {
+                label: 'Marital Status',
+                options: ['Single', 'Divorced', 'Widowed'],
+                value: maritalStatus,
+                set: setMaritalStatus,
+              },
+              {
+                label: 'Drinking Preference',
+                options: ['Yes', 'No'],
+                value: drinking,
+                set: setDrinking,
+              },
+              {
+                label: 'Smoking Preference',
+                options: ['Yes', 'No'],
+                value: smoking,
+                set: setSmoking,
+              },
+            ].map((section, i) =>
+              section.options ? (
+                <View key={i} style={styles.inputGroup}>
+                  <Text style={styles.label}>{section.label}</Text>
+                  <View style={styles.row}>
+                    {section.options.map((option) => (
+                      <Pressable
+                        key={option}
+                        onPress={() => section.set(option)}
+                        style={[
+                          styles.optionButton,
+                          section.value?.toLowerCase() === option.toLowerCase() &&
+                            styles.selectedOption,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            section.value?.toLowerCase() === option.toLowerCase() &&
+                              styles.selectedOptionText,
+                          ]}
+                        >
+                          {option}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.inputGroup} key={i}>
+                  <Text style={styles.label}>{section.label}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={section.value}
+                    onChangeText={section.set}
+                    keyboardType={section.keyboardType || 'default'}
+                  />
+                </View>
+              )
+            )}
 
-          <Text style={styles.label}>Gender*</Text>
-          <View style={styles.row}>
-            {['Male', 'Female'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => setGender(option)}
-                style={[
-                  styles.optionButton,
-                  gender === option && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    gender === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Hobbies & Interests (Up to 6)</Text>
+              <View style={styles.row}>
+                {ALL_HOBBIES.map((hobby) => (
+                  <Pressable
+                    key={hobby}
+                    onPress={() => toggleHobby(hobby)}
+                    style={[
+                      styles.optionButton,
+                      hobbies.includes(hobby) && styles.selectedOption,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        hobbies.includes(hobby) && styles.selectedOptionText,
+                      ]}
+                    >
+                      {hobby}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>About Me (150 Characters Max)</Text>
+              <TextInput
+                style={[styles.input, { textAlignVertical: 'top' }]}
+                value={aboutMe}
+                onChangeText={setAboutMe}
+                maxLength={150}
+                multiline
+              />
+            </View>
+
+            <Pressable style={styles.button} onPress={handleSave}>
+              <Text style={styles.buttonText}>Save</Text>
+            </Pressable>
           </View>
-
-          <Text style={styles.label}>Headline* (25 characters)</Text>
-          <TextInput
-            style={styles.input}
-            maxLength={25}
-            value={headline}
-            onChangeText={setHeadline}
-          />
-
-          <Text style={styles.label}>Location (City, State)</Text>
-          <TextInput style={styles.input} value={location} onChangeText={setLocation} />
-
-          <Text style={styles.label}>Denomination</Text>
-          <View style={styles.row}>
-            {['Presbyterian', 'Baptist', 'Methodist', 'Other'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => setDenomination(option)}
-                style={[
-                  styles.optionButton,
-                  denomination === option && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    denomination === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Marital Status</Text>
-          <View style={styles.row}>
-            {['Single', 'Divorced', 'Widowed'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => setMaritalStatus(option)}
-                style={[
-                  styles.optionButton,
-                  maritalStatus === option && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    maritalStatus === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Drinking Preference</Text>
-          <View style={styles.row}>
-            {['Yes', 'No'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => setDrinking(option)}
-                style={[
-                  styles.optionButton,
-                  drinking === option && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    drinking === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Smoking Preference</Text>
-          <View style={styles.row}>
-            {['Yes', 'No'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => setSmoking(option)}
-                style={[
-                  styles.optionButton,
-                  smoking === option && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    smoking === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Hobbies & Interests (Up to 6)</Text>
-          <View style={styles.row}>
-            {ALL_HOBBIES.map((hobby) => (
-              <Pressable
-                key={hobby}
-                onPress={() => toggleHobby(hobby)}
-                style={[
-                  styles.optionButton,
-                  hobbies.includes(hobby) && styles.selectedOption,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    hobbies.includes(hobby) && styles.selectedOptionText,
-                  ]}
-                >
-                  {hobby}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>About Me (100 chars max)</Text>
-          <TextInput
-            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-            multiline
-            maxLength={100}
-            value={aboutMe}
-            onChangeText={setAboutMe}
-          />
-
-          <Pressable style={styles.button} onPress={handleSave}>
-            <Text style={styles.buttonText}>Save</Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: SIDE_PADDING,
-    backgroundColor: DARK_PURPLE,
-    flexGrow: 1,
-  },
-  title: {
-    color: '#eee',
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  sectionLabel: {
-    color: '#ccc',
-    marginBottom: 10,
-  },
-  photoGrid: {
-    marginBottom: 20,
-  },
-  photoBox: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: GRAY,
-    margin: SPACING / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  addButton: {
-    backgroundColor: PURPLE,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  deleteX: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'black',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: {
-    color: '#ccc',
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: PINK,
-    borderRadius: 10,
-    padding: 15,
-    color: '#eee',
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
-  optionButton: {
-    borderWidth: 1,
-    borderColor: PINK,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginRight: 10,
-    marginTop: 8,
-    backgroundColor: 'transparent',
-  },
-  selectedOption: {
-    backgroundColor: PINK,
-  },
-  optionText: {
-    color: '#eee',
-  },
-  selectedOptionText: {
-    color: DARK_PURPLE,
-  },
-  button: {
-    backgroundColor: PURPLE,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 40,
-  },
-  buttonText: {
-    color: '#eee',
-    fontWeight: 'bold',
-  },
-});
