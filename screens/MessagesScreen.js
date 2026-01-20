@@ -10,16 +10,16 @@ import {
 } from 'react-native';
 import TopNavBar from '../components/TopNavBar';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import api from '../config/api';
 
-export default function MessagesScreen({ userId, baseUrl, onLogout }) {
+export default function MessagesScreen({ userId, onLogout }) {
   const navigation = useNavigation();
   const [conversations, setConversations] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch(`${baseUrl}/api/messages/conversations/${userId}`);
-      const data = await res.json();
+      const data = await api.get(`/api/messages/conversations/${userId}`);
       const sorted = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       setConversations(sorted);
     } catch (err) {
@@ -47,7 +47,6 @@ export default function MessagesScreen({ userId, baseUrl, onLogout }) {
     navigation.navigate('Chat', {
       user,
       currentUserId: userId,
-      baseUrl,
     });
   };
 

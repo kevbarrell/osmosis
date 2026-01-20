@@ -9,17 +9,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  SafeAreaView,
   StatusBar,
   Keyboard,
   TouchableWithoutFeedback,
   Modal
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../config/api';
 
 export default function ChatScreen({ route }) {
-  const { user, currentUserId, baseUrl } = route.params;
+  const { user, currentUserId } = route.params; // ✅ removed baseUrl
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
@@ -30,31 +31,27 @@ export default function ChatScreen({ route }) {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`${baseUrl}/api/messages/${currentUserId}/${user._id}`);
-        const data = await res.json();
-        setMessages(data.reverse()); // reverse for inverted FlatList
+        const data = await api.get(`/api/messages/${currentUserId}/${user._id}`);
+        setMessages(Array.isArray(data) ? data.reverse() : []);
       } catch (err) {
         console.error('Error fetching messages:', err);
       }
     };
-    fetchMessages();
-  }, []);
+
+    if (currentUserId && user?._id) fetchMessages();
+  }, [currentUserId, user?._id]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
 
     try {
-      const res = await fetch(`${baseUrl}/api/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sender: currentUserId,
-          recipient: user._id,
-          text: input,
-        })
+      const newMessage = await api.post(`/api/messages`, {
+        sender: currentUserId,
+        recipient: user._id,
+        text: input,
       });
-      const newMessage = await res.json();
-      setMessages((prev) => [newMessage, ...prev]); // prepend to match inverted order
+
+      setMessages((prev) => [newMessage, ...prev]);
       setInput('');
     } catch (err) {
       console.error('Error sending message:', err);
@@ -76,7 +73,9 @@ export default function ChatScreen({ route }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#440544', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor="#440544" />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -84,7 +83,6 @@ export default function ChatScreen({ route }) {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.container}>
-            {/* Custom Top Bar */}
             <View style={styles.topBar}>
               <Pressable onPress={handleBack} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color="#eee" />
@@ -96,7 +94,6 @@ export default function ChatScreen({ route }) {
               </Pressable>
             </View>
 
-            {/* Chat messages */}
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -123,7 +120,6 @@ export default function ChatScreen({ route }) {
               inverted
             />
 
-            {/* Input bar */}
             <View style={styles.inputBar}>
               <TextInput
                 ref={inputRef}
@@ -138,7 +134,6 @@ export default function ChatScreen({ route }) {
               </Pressable>
             </View>
 
-            {/* Menu Modal */}
             <Modal
               transparent
               visible={menuVisible}
@@ -149,7 +144,11 @@ export default function ChatScreen({ route }) {
                 <View style={styles.modalOverlay}>
                   <View style={styles.menu}>
                     {['Unmatch', 'Block', 'Report'].map((option) => (
-                      <Pressable key={option} onPress={() => handleMenuOption(option)} style={styles.menuItem}>
+                      <Pressable
+                        key={option}
+                        onPress={() => handleMenuOption(option)}
+                        style={styles.menuItem}
+                      >
                         <Text style={styles.menuText}>{option}</Text>
                       </Pressable>
                     ))}
@@ -165,6 +164,7 @@ export default function ChatScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#440544' },
   container: { flex: 1, backgroundColor: '#440544' },
   topBar: {
     flexDirection: 'row',
@@ -172,9 +172,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#440544',
   },
-  backButton: {
-    paddingRight: 10,
-  },
+  backButton: { paddingRight: 10 },
   profileImage: {
     width: 36,
     height: 36,
@@ -193,6 +191,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 18,
     marginVertical: 4,
+    marginHorizontal: 10,
     alignSelf: 'flex-start',
   },
   mine: {
@@ -204,13 +203,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#E892E8',
     borderTopLeftRadius: 0,
   },
-  bubbleText: {
-    fontSize: 16,
-    color: '#440544',
-  },
-  myText: {
-    color: '#eee',
-  },
+  bubbleText: { fontSize: 16, color: '#440544' },
+  myText: { color: '#eee' },
   inputBar: {
     flexDirection: 'row',
     paddingVertical: 8,
@@ -237,7 +231,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 55 : 55,
+    paddingTop: 55,
     paddingRight: 15,
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
@@ -251,12 +245,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  menuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#333',
-  },
+  menuItem: { paddingVertical: 12, paddingHorizontal: 16 },
+  menuText: { fontSize: 16, color: '#333' },
 });

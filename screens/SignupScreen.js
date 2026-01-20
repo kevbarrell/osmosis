@@ -9,10 +9,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+
+import api, { API_URL } from '../config/api';
 
 export default function SignupScreen({ navigation, onLoginSuccess }) {
   const [firstName, setFirstName] = useState('');
@@ -22,7 +24,9 @@ export default function SignupScreen({ navigation, onLoginSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const baseUrl = 'http://192.168.0.18:5000';
+
+  // ✅ centralized
+  const baseUrl = API_URL;
 
   const handleSignup = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !password || !confirmPassword) {
@@ -33,19 +37,22 @@ export default function SignupScreen({ navigation, onLoginSuccess }) {
       return Alert.alert('Error', 'Passwords do not match.');
     }
 
+    if (!baseUrl) {
+      return Alert.alert(
+        'Config Error',
+        'API URL is missing. Check EXPO_PUBLIC_API_URL in your .env and restart Expo with -c.'
+      );
+    }
+
     try {
-      const res = await fetch(`${baseUrl}/api/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `${firstName} ${lastName}`, email, password })
+      // ✅ use api.js (centralized base URL)
+      const data = await api.post('/api/users', {
+        name: `${firstName} ${lastName}`,
+        email,
+        password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        return Alert.alert('Signup Failed', data.message || 'Try again.');
-      }
-
+      // NOTE: your /api/users POST returns the saved user doc, so id is data._id
       await SecureStore.setItemAsync('token', 'placeholder'); // you can use real tokens later
       await SecureStore.setItemAsync('userId', data._id);
 
@@ -53,7 +60,15 @@ export default function SignupScreen({ navigation, onLoginSuccess }) {
       onLoginSuccess(data._id);
     } catch (err) {
       console.error('Signup error:', err);
-      Alert.alert('Signup Failed', 'Something went wrong.');
+
+      // api.js throws, so we try to surface the most useful message
+      const msg =
+        err?.data?.message ||
+        err?.data?.error ||
+        err?.message ||
+        'Something went wrong.';
+
+      Alert.alert('Signup Failed', msg);
     }
   };
 

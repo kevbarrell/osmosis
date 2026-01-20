@@ -1,20 +1,21 @@
+// HomeScreen.js
 import { useEffect, useState, useCallback } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   Modal,
   Pressable,
   Image,
-  Alert
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Swiper from 'react-native-deck-swiper';
 import ProfileCard from '../components/ProfileCard';
 import TopNavBar from '../components/TopNavBar';
+import api from '../config/api';
 
-export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
+export default function HomeScreen({ userId, navigation, onLogout }) {
   const [profiles, setProfiles] = useState([]);
   const [match, setMatch] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -22,26 +23,24 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
 
   const fetchUsers = async () => {
     try {
-      const [recommendRes, userRes] = await Promise.all([
-        fetch(`${baseUrl}/api/users/${userId}/recommendations`),
-        fetch(`${baseUrl}/api/users/${userId}`)
+      const [recommendData, userData] = await Promise.all([
+        api.get(`/api/users/${userId}/recommendations`),
+        api.get(`/api/users/${userId}`),
       ]);
 
-      const { users, secondChance } = await recommendRes.json();
-      const user = await userRes.json();
+      const { users, secondChance } = recommendData || {};
+      const user = userData;
 
-      if (!Array.isArray(users) || !user._id) throw new Error('Invalid data');
+      if (!Array.isArray(users) || !user?._id) throw new Error('Invalid data');
 
       setCurrentUser(user);
-      setSecondChanceMode(secondChance);
+      setSecondChanceMode(!!secondChance);
       setProfiles(users);
 
       if (secondChance) {
         await Promise.all(
           users.map((profile) =>
-            fetch(`${baseUrl}/api/users/${userId}/secondChance/${profile._id}`, {
-              method: 'PATCH'
-            })
+            api.patch(`/api/users/${userId}/secondChance/${profile._id}`)
           )
         );
       }
@@ -67,14 +66,12 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
     const action = direction === 'right' ? 'like' : 'reject';
 
     try {
-      const res = await fetch(`${baseUrl}/api/users/${userId}/swipe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetId: swipedUser._id, action })
+      const data = await api.post(`/api/users/${userId}/swipe`, {
+        targetId: swipedUser._id,
+        action,
       });
 
-      const data = await res.json();
-      if (data.match) setMatch(swipedUser);
+      if (data?.match) setMatch(swipedUser);
     } catch (err) {
       console.error(`${action} error:`, err);
     }
@@ -82,19 +79,18 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
 
   const handleSwipedAll = async () => {
     try {
-      const res = await fetch(`${baseUrl}/api/users/${userId}/recommendations`);
-      const { users, secondChance } = await res.json();
+      const { users, secondChance } = await api.get(
+        `/api/users/${userId}/recommendations`
+      );
 
-      if (users.length > 0) {
-        setSecondChanceMode(secondChance);
+      if (Array.isArray(users) && users.length > 0) {
+        setSecondChanceMode(!!secondChance);
         setProfiles(users);
 
         if (secondChance) {
           await Promise.all(
             users.map((profile) =>
-              fetch(`${baseUrl}/api/users/${userId}/secondChance/${profile._id}`, {
-                method: 'PATCH'
-              })
+              api.patch(`/api/users/${userId}/secondChance/${profile._id}`)
             )
           );
         }
@@ -108,7 +104,7 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <TopNavBar onLogout={onLogout} navigation={navigation} />
       <View style={styles.container}>
         {profiles.length > 0 ? (
@@ -127,6 +123,7 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
                     age={card.age}
                     image={card.image}
                     bio={card.bio}
+                    distanceMiles={card.distanceMiles}
                   />
                 </View>
               ) : null
@@ -166,7 +163,7 @@ export default function HomeScreen({ userId, baseUrl, navigation, onLogout }) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -201,12 +198,12 @@ const styles = StyleSheet.create({
   matchText: {
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'center'
+    textAlign: 'center',
   },
   matchImage: {
     width: 100,
     height: 100,
-    borderRadius: 50
+    borderRadius: 50,
   },
   dismiss: {
     marginTop: 20,
@@ -230,7 +227,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 5,
-    zIndex: 2
+    zIndex: 2,
   },
   badgeText: {
     color: '#eee',

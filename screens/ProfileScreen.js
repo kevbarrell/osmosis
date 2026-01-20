@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,27 +7,32 @@ import {
   Image,
   Pressable,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TopNavBar from '../components/TopNavBar';
+import api from '../config/api';
 
-const PURPLE = '#6B21A8';
 const DARK_PURPLE = '#440544';
 const PINK = '#EC4899';
 
 export default function ProfileScreen({ navigation, route }) {
-  const { userId, baseUrl, onLogout } = route.params;
+  const { userId, onLogout } = route.params || {};
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async () => {
+    if (!userId) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`${baseUrl}/api/users/${userId}`);
-      const data = await res.json();
+      const data = await api.get(`/api/users/${userId}`);
       setProfile(data);
     } catch (err) {
       console.error(err);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -37,30 +42,46 @@ export default function ProfileScreen({ navigation, route }) {
     fetchProfile();
   }, []);
 
+  // Refresh profile when returning from EditProfile
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setLoading(true);
+      fetchProfile();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const handleEditProfile = useCallback(() => {
+    // ✅ jump straight to the root stack that contains EditProfile
+    const root = navigation.getParent?.('RootStack');
+    root?.navigate('EditProfile');
+  }, [navigation]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <TopNavBar onLogout={onLogout} navigation={navigation} />
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         <TopNavBar onLogout={onLogout} navigation={navigation} />
         <View style={styles.center}>
           <Text style={{ color: 'white' }}>Profile not found.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <TopNavBar onLogout={onLogout} navigation={navigation} />
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -86,7 +107,7 @@ export default function ProfileScreen({ navigation, route }) {
           <Info label="Age" value={profile.age} />
           <Info label="Gender" value={profile.gender} />
           <Info label="Headline" value={profile.headline} />
-          <Info label="Location" value={profile.location} />
+          <Info label="ZIP Code" value={profile.zipCode} />
           <Info label="Denomination" value={profile.denomination} />
           <Info label="Marital Status" value={profile.maritalStatus} />
           <Info label="Drinking" value={profile.drinking} />
@@ -95,23 +116,23 @@ export default function ProfileScreen({ navigation, route }) {
           <Info label="About Me" value={profile.aboutMe} />
         </ScrollView>
 
-        <Pressable
-          style={styles.fab}
-          onPress={() => navigation.navigate('EditProfile')}
-        >
+        <Pressable style={styles.fab} onPress={handleEditProfile}>
           <Ionicons name="create" size={24} color="white" />
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function Info({ label, value }) {
   if (!value) return null;
+
+  const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+
   return (
     <View style={styles.infoRow}>
       <Text style={styles.label}>{label}:</Text>
-      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.value}>{displayValue}</Text>
     </View>
   );
 }

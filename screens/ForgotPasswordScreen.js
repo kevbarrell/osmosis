@@ -5,8 +5,9 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -22,49 +23,59 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Forgot Password</Text>
-      {submitted ? (
-        <Text style={styles.message}>
-          If an account with that email exists, a reset link has been sent.
-        </Text>
-      ) : (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your email"
-            placeholderTextColor="#ccc"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <Pressable style={styles.button} onPress={handleSubmit}>
-            <Text style={styles.buttonText}>Reset Password</Text>
-          </Pressable>
-        </>
-      )}
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Forgot Password</Text>
 
-      <Pressable style={styles.backLink} onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.backText}>Back to Login</Text>
-      </Pressable>
-    </View>
+        {submitted ? (
+          <Text style={styles.message}>
+            If an account with that email exists, a reset link has been sent.
+          </Text>
+        ) : (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              placeholderTextColor="#ccc"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <Pressable style={styles.button} onPress={handleSubmit}>
+              <Text style={styles.buttonText}>Reset Password</Text>
+            </Pressable>
+          </>
+        )}
+
+        <Pressable
+          style={styles.backLink}
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text style={styles.backText}>Back to Login</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: '#440544',
+  },
+  container: {
+    flex: 1,
     padding: 20,
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   title: {
     color: '#eee',
     fontSize: 26,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 30
+    marginBottom: 30,
   },
   input: {
     borderWidth: 1,
@@ -72,29 +83,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     color: '#eee',
-    marginBottom: 20
+    marginBottom: 20,
   },
   button: {
     backgroundColor: '#A828AA',
     padding: 15,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   buttonText: {
     color: '#eee',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   message: {
     color: '#eee',
     textAlign: 'center',
     fontSize: 16,
-    paddingHorizontal: 10
+    paddingHorizontal: 10,
   },
   backLink: {
     marginTop: 20,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   backText: {
     color: '#E892E8',
-    fontWeight: 'bold',}
+    fontWeight: 'bold',
+  },
 });

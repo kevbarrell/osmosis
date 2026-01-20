@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Pressable,
@@ -7,18 +7,20 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Text
+  Text,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import Logo from '../assets/logo.svg'; // SVG as React component
+import Logo from '../assets/logo.svg';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export default function TopNavBar({ onLogout, navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
-  const slideAnim = useState(new Animated.Value(-SCREEN_HEIGHT))[0];
+  const slideAnim = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
+  const insets = useSafeAreaInsets();
 
   const openModal = () => {
     setModalVisible(true);
@@ -38,9 +40,7 @@ export default function TopNavBar({ onLogout, navigation }) {
       useNativeDriver: true,
     }).start(() => {
       setModalVisible(false);
-      if (callback) {
-        setTimeout(callback, 50);
-      }
+      if (callback) setTimeout(callback, 50);
     });
   };
 
@@ -51,39 +51,68 @@ export default function TopNavBar({ onLogout, navigation }) {
     closeModal(onLogout);
   };
 
+  const handleEditProfile = () => {
+    closeModal(() => {
+      // If your RootStack has id="RootStack", this will always work from tabs
+      const root = navigation?.getParent?.('RootStack');
+      if (root) root.navigate('EditProfile');
+      else navigation?.navigate?.('EditProfile');
+    });
+  };
+
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.navBar}>
-        <Logo width={180} height={60} />
-        <Pressable onPress={openModal}>
-          <Ionicons name="menu" size={28} color="#eee" />
-        </Pressable>
-      </View>
-
-      <Modal visible={modalVisible} transparent animationType="none">
-        <Animated.View
-          style={[
-            styles.modalContent,
-            { transform: [{ translateY: slideAnim }] },
-          ]}
-        >
-          <Pressable style={styles.closeButton} onPress={() => closeModal()}>
-            <Ionicons name="close" size={28} color="#eee" />
+    <>
+      {/* ✅ Safe area ONLY for the top header bar */}
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <View style={styles.navBar}>
+          <Logo width={180} height={60} />
+          <Pressable onPress={openModal} hitSlop={10}>
+            <Ionicons name="menu" size={28} color="#eee" />
           </Pressable>
+        </View>
+      </SafeAreaView>
 
-          <View style={styles.optionContainer}>
-            <Pressable style={styles.option}><Text style={styles.optionText}>Edit Profile</Text></Pressable>
-            <Pressable style={styles.option}><Text style={styles.optionText}>Privacy Notice</Text></Pressable>
-            <Pressable style={styles.option}><Text style={styles.optionText}>Report a Problem</Text></Pressable>
-            <Pressable style={styles.option}><Text style={styles.optionText}>Contact Us</Text></Pressable>
-            <Pressable style={styles.option}><Text style={styles.optionText}>Pause/Delete Account</Text></Pressable>
-            <Pressable style={styles.option} onPress={handleLogout}>
-              <Text style={[styles.optionText, { color: '#E892E8' }]}>Logout</Text>
+      {/* ✅ Modal is separate so we don’t double-apply safe-area padding */}
+      <Modal visible={modalVisible} transparent animationType="none" onRequestClose={() => closeModal()}>
+        <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+          <SafeAreaView edges={['top']} style={styles.modalSafe}>
+            <Pressable
+              style={[styles.closeButton, { top: (insets.top || 0) + 10 }]}
+              onPress={() => closeModal()}
+              hitSlop={10}
+            >
+              <Ionicons name="close" size={28} color="#eee" />
             </Pressable>
-          </View>
+
+            <View style={styles.optionContainer}>
+              <Pressable style={styles.option} onPress={handleEditProfile}>
+                <Text style={styles.optionText}>Edit Profile</Text>
+              </Pressable>
+
+              <Pressable style={styles.option}>
+                <Text style={styles.optionText}>Privacy Notice</Text>
+              </Pressable>
+
+              <Pressable style={styles.option}>
+                <Text style={styles.optionText}>Report a Problem</Text>
+              </Pressable>
+
+              <Pressable style={styles.option}>
+                <Text style={styles.optionText}>Contact Us</Text>
+              </Pressable>
+
+              <Pressable style={styles.option}>
+                <Text style={styles.optionText}>Pause/Delete Account</Text>
+              </Pressable>
+
+              <Pressable style={styles.option} onPress={handleLogout}>
+                <Text style={[styles.optionText, { color: '#E892E8' }]}>Logout</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
         </Animated.View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 
@@ -95,24 +124,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+
+    // ✅ Don’t add extra top padding here—SafeAreaView already handles that
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+
     backgroundColor: '#440544',
   },
+
   modalContent: {
     position: 'absolute',
     top: 0,
     width: '100%',
     height: '100%',
     backgroundColor: '#440544',
+  },
+
+  modalSafe: {
+    flex: 1,
     paddingHorizontal: 20,
     justifyContent: 'center',
   },
+
   closeButton: {
     position: 'absolute',
-    top: 50,
     right: 20,
     zIndex: 1,
   },
+
   optionContainer: {
     alignItems: 'center',
     justifyContent: 'center',

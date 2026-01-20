@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import TopNavBar from '../components/TopNavBar';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import api from '../config/api';
 
-export default function MatchesScreen({ userId, baseUrl, onLogout }) {
+export default function MatchesScreen({ userId, onLogout }) {
   const [matches, setMatches] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,11 +20,10 @@ export default function MatchesScreen({ userId, baseUrl, onLogout }) {
 
   const fetchData = async () => {
     try {
-      const matchRes = await fetch(`${baseUrl}/api/users/${userId}/matches`);
-      const matchData = await matchRes.json();
-
-      const convoRes = await fetch(`${baseUrl}/api/messages/conversations/${userId}`);
-      const convoData = await convoRes.json();
+      const [matchData, convoData] = await Promise.all([
+        api.get(`/api/users/${userId}/matches`),
+        api.get(`/api/messages/conversations/${userId}`),
+      ]);
 
       const messagedUserIds = new Set(convoData.map((c) => c.otherUser._id));
       const newMatches = matchData
@@ -59,7 +59,6 @@ export default function MatchesScreen({ userId, baseUrl, onLogout }) {
       params: {
         user,
         currentUserId: userId,
-        baseUrl,
       }
     });
   };

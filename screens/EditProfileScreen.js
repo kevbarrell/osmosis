@@ -9,15 +9,14 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  SafeAreaView,
-  Dimensions,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import styles from '../constants/styles';
 import colors from '../constants/colors';
+import api from '../config/api';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const NUM_COLUMNS = 3;
 
 const ALL_HOBBIES = [
@@ -28,13 +27,18 @@ const ALL_HOBBIES = [
   'Biking', 'Yoga', 'Camping', 'Bowling',
 ];
 
-export default function EditProfileScreen({ navigation, route, justSignedUp, setJustSignedUp }) {
-  const { userId, baseUrl } = route.params;
+export default function EditProfileScreen(props) {
+  const { navigation, route } = props;
+  const { userId } = route.params || {};
+
+  const justSignedUp = props.justSignedUp ?? false;
+  const setJustSignedUp = props.setJustSignedUp ?? (() => {});
+  const setProfileCompleted = props.setProfileCompleted ?? (() => {});
 
   const [photos, setPhotos] = useState([]);
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
-  const [location, setLocation] = useState('');
+  const [zipCode, setZipCode] = useState('');
   const [denomination, setDenomination] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
   const [drinking, setDrinking] = useState('');
@@ -42,23 +46,28 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
   const [hobbies, setHobbies] = useState([]);
   const [aboutMe, setAboutMe] = useState('');
 
+  const isValidUSZip = (zip) => /^\d{5}$/.test(String(zip || '').trim());
+
   useEffect(() => {
     const fetchUserData = async () => {
+      if (!userId) return;
+
       try {
-        const res = await fetch(`${baseUrl}/api/users/${userId}`);
-        const data = await res.json();
-        if (res.ok) {
-          setPhotos(data.photos?.map((uri, i) => ({ key: `photo-${i}`, uri })) || []);
-          setAge(data.age?.toString() || '');
-          setGender(data.gender || '');
-          setLocation(data.location || '');
-          setDenomination(data.denomination || '');
-          setMaritalStatus(data.maritalStatus || '');
-          setDrinking(data.drinking || '');
-          setSmoking(data.smoking || '');
-          setHobbies(data.hobbies || []);
-          setAboutMe(data.aboutMe || '');
-        }
+        // ✅ use api helper (no api.url / no baseUrl param required)
+        const data = await api.get(`/api/users/${userId}`);
+
+        setPhotos(
+          (data.photos || []).map((uri, i) => ({ key: `photo-${i}`, uri }))
+        );
+        setAge(data.age != null ? String(data.age) : '');
+        setGender(data.gender || '');
+        setZipCode(data.zipCode || '');
+        setDenomination(data.denomination || '');
+        setMaritalStatus(data.maritalStatus || '');
+        setDrinking(data.drinking || '');
+        setSmoking(data.smoking || '');
+        setHobbies(Array.isArray(data.hobbies) ? data.hobbies : []);
+        setAboutMe(data.aboutMe || '');
       } catch (err) {
         console.error('Error loading profile:', err);
       }
@@ -73,7 +82,7 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
@@ -81,7 +90,9 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
     });
 
     if (!result.canceled) {
-      const uri = result.assets[0].uri;
+      const uri = result.assets?.[0]?.uri;
+      if (!uri) return;
+
       setPhotos((prev) => [...prev, { key: Date.now().toString(), uri }]);
     }
   };
@@ -106,10 +117,7 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
       <View style={[styles.photoBox, { borderColor: colors.lightPink }]}>
         <Image source={{ uri: item.uri }} style={styles.photo} />
         <Pressable
-          onPress={() => {
-            const updated = photos.filter((p) => p.key !== item.key);
-            setPhotos(updated);
-          }}
+          onPress={() => setPhotos((prev) => prev.filter((p) => p.key !== item.key))}
           style={styles.deleteX}
         >
           <Text style={styles.deleteXText}>×</Text>
@@ -129,47 +137,59 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
   };
 
   const handleSave = async () => {
-    if (!age || !gender || photos.length === 0) {
-      Alert.alert('Error', 'Please fill out your age, gender, and upload at least one photo.');
+    if (!userId) {
+      Alert.alert('Error', 'Missing user info. Please restart the app.');
+      return;
+    }
+
+    // ZIP required
+    if (!age || !gender || photos.length === 0 || !zipCode) {
+      Alert.alert(
+        'Error',
+        'Please fill out age, gender, ZIP code, and upload at least one photo.'
+      );
+      return;
+    }
+
+    if (!isValidUSZip(zipCode)) {
+      Alert.alert('Error', 'Please enter a valid 5-digit ZIP code.');
       return;
     }
 
     const profileData = {
       photos: photos.map((p) => p.uri),
-      age,
-      gender: gender.toLowerCase(),
-      location,
+      age: Number(age),
+      gender: String(gender).toLowerCase(),
+      zipCode: String(zipCode).trim(),
       denomination,
       maritalStatus,
       drinking,
       smoking,
       hobbies,
       aboutMe,
+      profileCompleted: true,
     };
 
     try {
-      const res = await fetch(`${baseUrl}/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profileData),
-      });
+      // ✅ use api helper
+      await api.put(`/api/users/${userId}`, profileData);
 
-      if (!res.ok) throw new Error('Failed to save profile');
+      setProfileCompleted(true);
 
       if (justSignedUp) {
         setJustSignedUp(false);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { userId } }],
-        });
+        navigation.reset({ index: 0, routes: [{ name: 'MainApp' }] });
+        return;
+      }
+
+      if (navigation.canGoBack()) {
+        navigation.goBack();
       } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { userId, screen: 'Profile' } }],
-        });
+        navigation.reset({ index: 0, routes: [{ name: 'MainApp' }] });
       }
     } catch (err) {
-      Alert.alert('Save Failed', 'Could not save your profile.');
+      console.error('Save profile error:', err);
+      Alert.alert('Save Failed', err?.message || 'Could not save your profile.');
     }
   };
 
@@ -201,9 +221,14 @@ export default function EditProfileScreen({ navigation, route, justSignedUp, set
                 label: 'Gender*',
                 options: ['Male', 'Female'],
                 value: gender,
-                set: (val) => setGender(val.toLowerCase()),
+                set: (val) => setGender(String(val).toLowerCase()),
               },
-              { label: 'Location (City, State)', value: location, set: setLocation },
+              {
+                label: 'ZIP Code* (5-digit)',
+                value: zipCode,
+                set: (val) => setZipCode(String(val).replace(/[^\d]/g, '').slice(0, 5)),
+                keyboardType: 'numeric',
+              },
               {
                 label: 'Denomination',
                 options: ['Presbyterian', 'Baptist', 'Methodist', 'Other'],
