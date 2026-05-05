@@ -1,15 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TopNavBar from '../components/TopNavBar';
+import ProfileCard from '../components/ProfileCard';
 import api from '../config/api';
 
 const DARK_PURPLE = '#440544';
@@ -40,9 +33,9 @@ export default function ProfileScreen({ navigation, route }) {
 
   useEffect(() => {
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refresh profile when returning from EditProfile
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       setLoading(true);
@@ -50,13 +43,40 @@ export default function ProfileScreen({ navigation, route }) {
     });
 
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
   const handleEditProfile = useCallback(() => {
-    // ✅ jump straight to the root stack that contains EditProfile
     const root = navigation.getParent?.('RootStack');
     root?.navigate('EditProfile');
   }, [navigation]);
+
+  const cardProps = useMemo(() => {
+    if (!profile) return null;
+
+    const first = profile.firstName || '';
+    const last = profile.lastName || '';
+    const fallbackName = `${first} ${last}`.trim();
+
+    const photos = Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [];
+    const image = profile.image || profile.mainPhoto || photos[0] || null;
+
+    return {
+      name: profile.name || fallbackName || 'You',
+      age: profile.age,
+      image,
+      distanceMiles: typeof profile.distanceMiles === 'number' ? profile.distanceMiles : 0,
+      denomination: profile.denomination,
+      maritalStatus: profile.maritalStatus,
+      hasChildren: profile.hasChildren,
+      drinking: profile.drinking,
+      smoking: profile.smoking,
+      hobbies: profile.hobbies,
+      aboutMe: profile.aboutMe,
+      photos,
+      variant: 'full',
+    };
+  }, [profile]);
 
   if (loading) {
     return (
@@ -69,7 +89,7 @@ export default function ProfileScreen({ navigation, route }) {
     );
   }
 
-  if (!profile) {
+  if (!profile || !cardProps) {
     return (
       <View style={styles.safe}>
         <TopNavBar onLogout={onLogout} navigation={navigation} />
@@ -83,56 +103,21 @@ export default function ProfileScreen({ navigation, route }) {
   return (
     <View style={styles.safe}>
       <TopNavBar onLogout={onLogout} navigation={navigation} />
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>Your Photos</Text>
-          <View style={styles.photoGrid}>
-            {profile.photos?.map((uri, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.photoBox,
-                  index === 0 && { borderColor: PINK, borderWidth: 3 },
-                ]}
-              >
-                <Image source={{ uri }} style={styles.photo} />
-                <View style={styles.orderNumber}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>{index + 1}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
 
-          <Text style={styles.sectionTitle}>Profile Info</Text>
-          <Info label="Age" value={profile.age} />
-          <Info label="Gender" value={profile.gender} />
-          <Info label="Headline" value={profile.headline} />
-          <Info label="ZIP Code" value={profile.zipCode} />
-          <Info label="Denomination" value={profile.denomination} />
-          <Info label="Marital Status" value={profile.maritalStatus} />
-          <Info label="Drinking" value={profile.drinking} />
-          <Info label="Smoking" value={profile.smoking} />
-          <Info label="Hobbies" value={profile.hobbies} />
-          <Info label="About Me" value={profile.aboutMe} />
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.whitePane}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <ProfileCard {...cardProps} />
         </ScrollView>
 
+        {/* Edit button unchanged */}
         <Pressable style={styles.fab} onPress={handleEditProfile}>
           <Ionicons name="create" size={24} color="white" />
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-function Info({ label, value }) {
-  if (!value) return null;
-
-  const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
-
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.label}>{label}:</Text>
-      <Text style={styles.value}>{displayValue}</Text>
     </View>
   );
 }
@@ -145,61 +130,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
+  whitePane: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
+
+  // ✅ Tighten a bit more while still preventing the FAB from covering content.
+  // This should feel close to your side spacing.
+  scrollContent: {
+    paddingBottom: 12,
+  },
+
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  photoBox: {
-    width: '30%',
-    aspectRatio: 1,
-    margin: '1.5%',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderColor: '#ccc',
-    borderWidth: 2,
-    position: 'relative',
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  orderNumber: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: 'black',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  infoRow: {
-    marginBottom: 8,
-  },
-  label: {
-    color: '#aaa',
-    fontWeight: 'bold',
-  },
-  value: {
-    color: 'white',
-    marginTop: 2,
-  },
+
   fab: {
     position: 'absolute',
     right: 20,

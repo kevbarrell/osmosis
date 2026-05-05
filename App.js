@@ -1,3 +1,4 @@
+// App.js
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -21,8 +22,9 @@ import SignupScreen from './screens/SignupScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import colors from './constants/colors';
+import UserProfileScreen from './screens/UserProfileScreen';
 
+import colors from './constants/colors';
 import { API_URL } from './config/api';
 
 const Tab = createBottomTabNavigator();
@@ -39,44 +41,55 @@ const CalvinCrushTheme = {
   },
 };
 
-function MessagesStack({ userId, baseUrl, onLogout }) {
+function MessagesStack({ userId, onLogout }) {
   const Inner = createNativeStackNavigator();
   return (
-    <Inner.Navigator screenOptions={{ headerShown: false }}>
-      <Inner.Screen
-        name="MessagesMain"
-        children={({ navigation }) => (
+    <Inner.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'none', // ✅ remove stack animations inside Messages
+      }}
+    >
+      <Inner.Screen name="MessagesMain">
+        {(props) => (
           <MessagesScreen
+            {...props}
             userId={userId}
             baseUrl={baseUrl}
             onLogout={onLogout}
-            navigation={navigation}
           />
         )}
-      />
+      </Inner.Screen>
       <Inner.Screen name="Chat" component={ChatScreen} />
     </Inner.Navigator>
   );
 }
 
-function MatchesStack({ userId, baseUrl, onLogout }) {
+function MatchesStack({ userId, onLogout }) {
   const Inner = createNativeStackNavigator();
   return (
-    <Inner.Navigator screenOptions={{ headerShown: false }}>
-      <Inner.Screen
-        name="MatchesMain"
-        children={() => (
-          <MatchesScreen userId={userId} baseUrl={baseUrl} onLogout={onLogout} />
+    <Inner.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'none', // ✅ remove stack animations inside Matches
+      }}
+    >
+      <Inner.Screen name="MatchesMain">
+        {(props) => (
+          <MatchesScreen
+            {...props}
+            userId={userId}
+            baseUrl={baseUrl}
+            onLogout={onLogout}
+          />
         )}
-      />
+      </Inner.Screen>
       <Inner.Screen name="Chat" component={ChatScreen} />
     </Inner.Navigator>
   );
 }
 
-function TabNavigator({ route }) {
-  const { userId, onLogout } = route.params;
-
+function TabNavigator({ userId, onLogout }) {
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -110,15 +123,22 @@ function TabNavigator({ route }) {
       })}
     >
       <Tab.Screen name="Home">
-        {() => <HomeScreen userId={userId} baseUrl={baseUrl} onLogout={onLogout} />}
+        {(props) => (
+          <HomeScreen
+            {...props}
+            userId={userId}
+            baseUrl={baseUrl}
+            onLogout={onLogout}
+          />
+        )}
       </Tab.Screen>
 
       <Tab.Screen name="Crushes">
-        {() => <MatchesStack userId={userId} baseUrl={baseUrl} onLogout={onLogout} />}
+        {() => <MatchesStack userId={userId} onLogout={onLogout} />}
       </Tab.Screen>
 
       <Tab.Screen name="Messages" options={{ unmountOnBlur: true }}>
-        {() => <MessagesStack userId={userId} baseUrl={baseUrl} onLogout={onLogout} />}
+        {() => <MessagesStack userId={userId} onLogout={onLogout} />}
       </Tab.Screen>
 
       <Tab.Screen name="Profile">
@@ -130,10 +150,9 @@ function TabNavigator({ route }) {
               params: {
                 userId,
                 baseUrl,
-                onLogout,
-                ...(props.route.params || {}),
               },
             }}
+            onLogout={onLogout}
           />
         )}
       </Tab.Screen>
@@ -146,6 +165,8 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [justSignedUp, setJustSignedUp] = useState(false);
   const [profileCompleted, setProfileCompleted] = useState(false);
+
+  const onLogout = () => setUserId(null);
 
   useEffect(() => {
     const checkToken = async () => {
@@ -189,7 +210,12 @@ export default function App() {
       <StatusBar backgroundColor="#440544" barStyle="light-content" />
       <NavigationContainer theme={CalvinCrushTheme}>
         {!userId ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              animation: 'none', // ✅ no auth animations
+            }}
+          >
             <Stack.Screen name="Login">
               {(props) => (
                 <LoginScreen
@@ -219,24 +245,20 @@ export default function App() {
           </Stack.Navigator>
         ) : (
           <Stack.Navigator
-            // ✅ critical: this id lets ProfileScreen reliably navigate to EditProfile
             id="RootStack"
             key={`${userId}-${needsProfile}`}
-            screenOptions={{ headerShown: false }}
+            screenOptions={{
+              headerShown: false,
+              animation: 'none', // ✅ removes RootStack push/pop animations (UserProfile back movement)
+            }}
             initialRouteName={needsProfile ? 'EditProfile' : 'MainApp'}
           >
             <Stack.Screen name="MainApp">
               {(props) => (
                 <TabNavigator
                   {...props}
-                  route={{
-                    ...props.route,
-                    params: {
-                      userId,
-                      onLogout: () => setUserId(null),
-                      ...(props.route.params || {}),
-                    },
-                  }}
+                  userId={userId}
+                  onLogout={onLogout}
                 />
               )}
             </Stack.Screen>
@@ -249,6 +271,21 @@ export default function App() {
                   justSignedUp={justSignedUp}
                   setJustSignedUp={setJustSignedUp}
                   setProfileCompleted={setProfileCompleted}
+                />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen
+              name="UserProfile"
+              options={{
+                animation: 'none', // ✅ extra explicit (some Android builds respect per-screen)
+              }}
+            >
+              {(props) => (
+                <UserProfileScreen
+                  {...props}
+                  userId={userId}
+                  onLogout={onLogout}
                 />
               )}
             </Stack.Screen>

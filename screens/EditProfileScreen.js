@@ -1,3 +1,4 @@
+// screens/EditProfileScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,8 +17,13 @@ import * as ImagePicker from 'expo-image-picker';
 import styles from '../constants/styles';
 import colors from '../constants/colors';
 import api from '../config/api';
+import HobbyChips from '../components/HobbyChips';
+
+const API_BASE_URL = 'https://calvincrush-api.onrender.com';
 
 const NUM_COLUMNS = 3;
+const MAX_PHOTOS = 3;
+const MAX_HOBBIES = 10;
 
 const ALL_HOBBIES = [
   'Hiking', 'Cooking', 'Dancing', 'Traveling', 'Movies',
@@ -25,6 +31,7 @@ const ALL_HOBBIES = [
   'Dogs', 'Cats', 'Volunteering', 'Live Music', 'Picnics',
   'Mini Golf', 'Photography', 'Beach', 'Karaoke', 'Art',
   'Biking', 'Yoga', 'Camping', 'Bowling',
+  'Video Games', 'Foodie',
 ];
 
 export default function EditProfileScreen(props) {
@@ -41,6 +48,7 @@ export default function EditProfileScreen(props) {
   const [zipCode, setZipCode] = useState('');
   const [denomination, setDenomination] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
+  const [hasChildren, setHasChildren] = useState('');
   const [drinking, setDrinking] = useState('');
   const [smoking, setSmoking] = useState('');
   const [hobbies, setHobbies] = useState([]);
@@ -53,20 +61,23 @@ export default function EditProfileScreen(props) {
       if (!userId) return;
 
       try {
-        // ✅ use api helper (no api.url / no baseUrl param required)
         const data = await api.get(`/api/users/${userId}`);
 
         setPhotos(
-          (data.photos || []).map((uri, i) => ({ key: `photo-${i}`, uri }))
+          (data.photos || [])
+            .slice(0, MAX_PHOTOS)
+            .map((uri, i) => ({ key: `photo-${i}`, uri }))
         );
+
         setAge(data.age != null ? String(data.age) : '');
         setGender(data.gender || '');
         setZipCode(data.zipCode || '');
         setDenomination(data.denomination || '');
         setMaritalStatus(data.maritalStatus || '');
+        setHasChildren(data.hasChildren || '');
         setDrinking(data.drinking || '');
         setSmoking(data.smoking || '');
-        setHobbies(Array.isArray(data.hobbies) ? data.hobbies : []);
+        setHobbies(Array.isArray(data.hobbies) ? data.hobbies.slice(0, MAX_HOBBIES) : []);
         setAboutMe(data.aboutMe || '');
       } catch (err) {
         console.error('Error loading profile:', err);
@@ -76,9 +87,41 @@ export default function EditProfileScreen(props) {
     fetchUserData();
   }, [userId]);
 
+  const uploadImage = async (imageUri) => {
+    const formData = new FormData();
+
+    formData.append('image', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: 'photo.jpg',
+    });
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Upload failed');
+      }
+
+      return data.imageUrl;
+    } catch (err) {
+      console.error('Upload error:', err);
+      Alert.alert('Upload Failed', err?.message || 'Could not upload image.');
+      return null;
+    }
+  };
+
   const pickImage = async () => {
-    if (photos.length >= 6) {
-      Alert.alert('Limit Reached', 'You can upload up to 6 photos.');
+    if (photos.length >= MAX_PHOTOS) {
+      Alert.alert('Limit Reached', `You can upload up to ${MAX_PHOTOS} photos.`);
       return;
     }
 
@@ -86,19 +129,26 @@ export default function EditProfileScreen(props) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 1,
+      quality: 0.7,
     });
 
     if (!result.canceled) {
       const uri = result.assets?.[0]?.uri;
       if (!uri) return;
 
-      setPhotos((prev) => [...prev, { key: Date.now().toString(), uri }]);
+      const uploadedUrl = await uploadImage(uri);
+      if (!uploadedUrl) return;
+
+      setPhotos((prev) => {
+        if (prev.length >= MAX_PHOTOS) return prev;
+        return [...prev, { key: Date.now().toString(), uri: uploadedUrl }];
+      });
     }
   };
 
   const displayPhotos = [...photos];
-  if (photos.length < 6) {
+
+  if (photos.length < MAX_PHOTOS) {
     displayPhotos.push({ key: 'add', type: 'add' });
   }
 
@@ -130,7 +180,7 @@ export default function EditProfileScreen(props) {
     setHobbies((prev) =>
       prev.includes(hobby)
         ? prev.filter((h) => h !== hobby)
-        : prev.length < 6
+        : prev.length < MAX_HOBBIES
         ? [...prev, hobby]
         : prev
     );
@@ -142,7 +192,6 @@ export default function EditProfileScreen(props) {
       return;
     }
 
-    // ZIP required
     if (!age || !gender || photos.length === 0 || !zipCode) {
       Alert.alert(
         'Error',
@@ -157,21 +206,21 @@ export default function EditProfileScreen(props) {
     }
 
     const profileData = {
-      photos: photos.map((p) => p.uri),
+      photos: photos.slice(0, MAX_PHOTOS).map((p) => p.uri),
       age: Number(age),
       gender: String(gender).toLowerCase(),
       zipCode: String(zipCode).trim(),
       denomination,
       maritalStatus,
+      hasChildren,
       drinking,
       smoking,
-      hobbies,
+      hobbies: hobbies.slice(0, MAX_HOBBIES),
       aboutMe,
       profileCompleted: true,
     };
 
     try {
-      // ✅ use api helper
       await api.put(`/api/users/${userId}`, profileData);
 
       setProfileCompleted(true);
@@ -204,7 +253,7 @@ export default function EditProfileScreen(props) {
             <Text style={styles.title}>Edit Profile</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Photos (Up to 6)*</Text>
+              <Text style={styles.label}>Photos (Up to {MAX_PHOTOS})*</Text>
               <FlatList
                 data={displayPhotos}
                 keyExtractor={(item) => item.key}
@@ -240,6 +289,12 @@ export default function EditProfileScreen(props) {
                 options: ['Single', 'Divorced', 'Widowed'],
                 value: maritalStatus,
                 set: setMaritalStatus,
+              },
+              {
+                label: 'Children',
+                options: ['Yes', 'No'],
+                value: hasChildren,
+                set: setHasChildren,
               },
               {
                 label: 'Drinking Preference',
@@ -295,28 +350,18 @@ export default function EditProfileScreen(props) {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hobbies & Interests (Up to 6)</Text>
-              <View style={styles.row}>
-                {ALL_HOBBIES.map((hobby) => (
-                  <Pressable
-                    key={hobby}
-                    onPress={() => toggleHobby(hobby)}
-                    style={[
-                      styles.optionButton,
-                      hobbies.includes(hobby) && styles.selectedOption,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        hobbies.includes(hobby) && styles.selectedOptionText,
-                      ]}
-                    >
-                      {hobby}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+              <Text style={styles.label}>Hobbies & Interests (Up to {MAX_HOBBIES})</Text>
+
+              <HobbyChips
+                mode="select"
+                items={[...ALL_HOBBIES].sort((a, b) => a.localeCompare(b))}
+                selected={hobbies}
+                onToggle={toggleHobby}
+                maxSelected={MAX_HOBBIES}
+                activeIconColor="#440544"
+                inactiveIconColor="#eee"
+                iconSize={16}
+              />
             </View>
 
             <View style={styles.inputGroup}>
